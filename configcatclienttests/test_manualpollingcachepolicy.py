@@ -4,7 +4,11 @@ from requests import HTTPError
 
 from configcatclient.configcache import InMemoryConfigCache
 from configcatclient.manualpollingcachepolicy import ManualPollingCachePolicy
-from configcatclienttests.mocks import ConfigFetcherMock, ConfigFetcherWithErrorMock, TEST_JSON
+from configcatclienttests.mocks import (
+    ConfigFetcherMock,
+    ConfigFetcherWithErrorMock,
+    TEST_JSON,
+)
 
 logging.basicConfig()
 
@@ -29,6 +33,26 @@ class ManualPollingCachePolicyTests(unittest.TestCase):
         self.assertEqual(config_fetcher.get_call_count, 1)
         cache_policy.stop()
 
+    def test_with_force_refresh(self):
+        config_fetcher = ConfigFetcherMock()
+        config_cache = InMemoryConfigCache()
+        cache_policy = ManualPollingCachePolicy(config_fetcher, config_cache)
+        cache_policy.force_refresh()
+        value = cache_policy.get()
+        self.assertEqual(value, TEST_JSON)
+        self.assertEqual(config_fetcher.get_call_count, 1)
+
+        try:
+            # Clear the cache
+            cache_policy._lock.acquire_write()
+            cache_policy._config_cache.set(None)
+        finally:
+            cache_policy._lock.release_write()
+
+        self.assertEqual(value, TEST_JSON)
+        self.assertEqual(config_fetcher.get_call_count, 1)
+        cache_policy.stop()
+
     def test_with_refresh_http_error(self):
         config_fetcher = ConfigFetcherWithErrorMock(HTTPError("error"))
         config_cache = InMemoryConfigCache()
@@ -48,5 +72,5 @@ class ManualPollingCachePolicyTests(unittest.TestCase):
         cache_policy.stop()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

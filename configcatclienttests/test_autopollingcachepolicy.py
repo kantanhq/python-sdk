@@ -5,8 +5,15 @@ from requests import HTTPError
 
 from configcatclient.autopollingcachepolicy import AutoPollingCachePolicy
 from configcatclient.configcache import InMemoryConfigCache
-from configcatclienttests.mocks import ConfigFetcherMock, ConfigFetcherWithErrorMock, ConfigFetcherWaitMock, \
-    ConfigFetcherCountMock, TEST_JSON, CallCounter, TEST_JSON2
+from configcatclienttests.mocks import (
+    ConfigFetcherMock,
+    ConfigFetcherWithErrorMock,
+    ConfigFetcherWaitMock,
+    ConfigFetcherCountMock,
+    TEST_JSON,
+    CallCounter,
+    TEST_JSON2,
+)
 
 logging.basicConfig()
 
@@ -107,7 +114,9 @@ class AutoPollingCachePolicyTests(unittest.TestCase):
         call_counter = CallCounter()
         config_fetcher = ConfigFetcherMock()
         config_cache = InMemoryConfigCache()
-        cache_policy = AutoPollingCachePolicy(config_fetcher, config_cache, 2, 5, call_counter.callback)
+        cache_policy = AutoPollingCachePolicy(
+            config_fetcher, config_cache, 2, 5, call_counter.callback
+        )
         time.sleep(1)
         self.assertEqual(config_fetcher.get_call_count, 1)
         self.assertEqual(call_counter.get_call_count, 1)
@@ -124,7 +133,9 @@ class AutoPollingCachePolicyTests(unittest.TestCase):
         call_counter = CallCounter()
         config_fetcher = ConfigFetcherMock()
         config_cache = InMemoryConfigCache()
-        cache_policy = AutoPollingCachePolicy(config_fetcher, config_cache, 2, 5, call_counter.callback_exception)
+        cache_policy = AutoPollingCachePolicy(
+            config_fetcher, config_cache, 2, 5, call_counter.callback_exception
+        )
         time.sleep(1)
         self.assertEqual(config_fetcher.get_call_count, 1)
         self.assertEqual(call_counter.get_call_count, 1)
@@ -137,6 +148,27 @@ class AutoPollingCachePolicyTests(unittest.TestCase):
         self.assertEqual(call_counter.get_call_count, 2)
         cache_policy.stop()
 
+    def test_refetch_config(self):
+        config_fetcher = ConfigFetcherMock()
+        config_cache = InMemoryConfigCache()
+        cache_policy = AutoPollingCachePolicy(config_fetcher, config_cache, 2, 1, None)
+        time.sleep(1.5)
+        config = cache_policy.get()
+        self.assertEqual(config, TEST_JSON)
 
-if __name__ == '__main__':
+        try:
+            # Clear the cache
+            cache_policy._lock.acquire_write()
+            cache_policy._config_cache.set(None)
+        finally:
+            cache_policy._lock.release_write()
+
+        time.sleep(1.5)
+        self.assertEqual(config_fetcher.get_call_count, 2)
+        config = cache_policy.get()
+        self.assertEqual(config, TEST_JSON)
+        cache_policy.stop()
+
+
+if __name__ == "__main__":
     unittest.main()
