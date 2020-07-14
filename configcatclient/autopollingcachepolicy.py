@@ -12,10 +12,14 @@ log = logging.getLogger(sys.modules[__name__].__name__)
 
 
 class AutoPollingCachePolicy(CachePolicy):
-
-    def __init__(self, config_fetcher, config_cache,
-                 poll_interval_seconds=60, max_init_wait_time_seconds=5,
-                 on_configuration_changed_callback=None):
+    def __init__(
+        self,
+        config_fetcher,
+        config_cache,
+        poll_interval_seconds=60,
+        max_init_wait_time_seconds=5,
+        on_configuration_changed_callback=None,
+    ):
         if poll_interval_seconds < 1:
             poll_interval_seconds = 1
         if max_init_wait_time_seconds < 0:
@@ -24,7 +28,9 @@ class AutoPollingCachePolicy(CachePolicy):
         self._config_fetcher = config_fetcher
         self._config_cache = config_cache
         self._poll_interval_seconds = poll_interval_seconds
-        self._max_init_wait_time_seconds = datetime.timedelta(seconds=max_init_wait_time_seconds)
+        self._max_init_wait_time_seconds = datetime.timedelta(
+            seconds=max_init_wait_time_seconds
+        )
         self._on_configuration_changed_callback = on_configuration_changed_callback
         self._initialized = False
         self._is_running = False
@@ -47,9 +53,12 @@ class AutoPollingCachePolicy(CachePolicy):
                 break
 
     def get(self):
-        while not self._initialized \
-                and datetime.datetime.utcnow() < self._start_time + self._max_init_wait_time_seconds:
-            time.sleep(.500)
+        while (
+            not self._initialized
+            and datetime.datetime.utcnow()
+            < self._start_time + self._max_init_wait_time_seconds
+        ):
+            time.sleep(0.500)
 
         try:
             self._lock.acquire_read()
@@ -59,13 +68,19 @@ class AutoPollingCachePolicy(CachePolicy):
 
     def force_refresh(self):
         try:
-            configuration_response = self._config_fetcher.get_configuration_json()
+            old_configuration = None
+            force_fetch = False
 
             try:
                 self._lock.acquire_read()
                 old_configuration = self._config_cache.get()
+                force_fetch = not bool(old_configuration)
             finally:
                 self._lock.release_read()
+
+            configuration_response = self._config_fetcher.get_configuration_json(
+                force_fetch
+            )
 
             if configuration_response.is_fetched():
                 configuration = configuration_response.json()
@@ -86,8 +101,10 @@ class AutoPollingCachePolicy(CachePolicy):
             if not self._initialized and old_configuration is not None:
                 self._initialized = True
         except HTTPError as e:
-            log.error('Double-check your SDK Key at https://app.configcat.com/sdkkey.'
-                      ' Received unexpected response: %s' % str(e.response))
+            log.error(
+                "Double-check your SDK Key at https://app.configcat.com/sdkkey."
+                " Received unexpected response: %s" % str(e.response)
+            )
         except:
             log.exception(sys.exc_info()[0])
 
